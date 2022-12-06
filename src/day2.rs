@@ -49,7 +49,9 @@ pub fn score_by_secret_guide() {
             .get(opponent)
             .expect("Got a response");
         let response_score = resposne_scores.get(response).expect("get a response score");
-        let outcome_score = game_outcome_scores.get(outcome).expect("get a outcome score");
+        let outcome_score = game_outcome_scores
+            .get(outcome)
+            .expect("get a outcome score");
         score += response_score + outcome_score;
     }
     println!("Score: {score}");
