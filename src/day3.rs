@@ -79,13 +79,12 @@ pub fn get_priorities_owned_by_3_elf() {
                 c += 1;
                 if e & occupancy[c - 1] {
                     priorities += c;
-                    if let 27..=52 = c {
-                        priorities -= 1;
-                    }
+                    break;
                 }
             }
-            group_item_cnt = 0;
+            group_item_cnt = -1;
         }
+        group_item_cnt += 1;
     }
     println!("priorities: {priorities}");
 }
