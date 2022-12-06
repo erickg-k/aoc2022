@@ -22,12 +22,32 @@ fn segment_inclusion(segment: &str) -> bool {
     }
 }
 
+fn segment_overlap(segment: &str) -> bool {
+    let pairs: Vec<&str> = segment.split(',').collect();
+    assert_eq!(pairs.len(), 2);
+    let (_len1, seg1) = analyze_assignment(pairs[0]);
+    let (_len2, seg2) = analyze_assignment(pairs[1]);
+    return seg1[1] >= seg2[0] && seg1[1] >= seg2[0];
+}
+
 pub fn count_segments_inclusions() {
     let mut cnt = 0;
     for line in io::stdin().lines() {
         let line_str = line.expect("IO failed reading data");
 
         if segment_inclusion(line_str.as_str()) {
+            cnt += 1;
+        }
+    }
+    println!("Count: {cnt}");
+}
+
+pub fn count_segments_overlap() {
+    let mut cnt = 0;
+    for line in io::stdin().lines() {
+        let line_str = line.expect("IO failed reading data");
+
+        if segment_overlap(line_str.as_str()) {
             cnt += 1;
         }
     }
