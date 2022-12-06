@@ -27,7 +27,7 @@ fn segment_overlap(segment: &str) -> bool {
     assert_eq!(pairs.len(), 2);
     let (_len1, seg1) = analyze_assignment(pairs[0]);
     let (_len2, seg2) = analyze_assignment(pairs[1]);
-    return seg1[1] >= seg2[0] && seg1[1] >= seg2[0];
+    return seg1[1] >= seg2[0] && seg1[0] <= seg2[1];
 }
 
 pub fn count_segments_inclusions() {
