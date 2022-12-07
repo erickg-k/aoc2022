@@ -1,12 +1,5 @@
+use crate::char_bins;
 use std::io;
-
-fn remap_char_to_flatten_loc(c: char) -> usize {
-    return match c {
-        'a'..='z' => c as u32 - 'a' as u32,
-        'A'..='Z' => c as u32 - 'A' as u32 + 26,
-        _ => 0,
-    } as usize;
-}
 
 fn remap_char_to_value(c: char) -> u32 {
     return match c {
@@ -21,10 +14,10 @@ fn get_occupancy(compartment: &str) -> [bool; 52] {
     for c in compartment.chars() {
         match c {
             'a'..='z' => {
-                occupancy[remap_char_to_flatten_loc(c)] = true;
+                occupancy[char_bins::remap_char_to_flatten_loc(c)] = true;
             }
             'A'..='Z' => {
-                occupancy[remap_char_to_flatten_loc(c)] = true;
+                occupancy[char_bins::remap_char_to_flatten_loc(c)] = true;
             }
             _ => todo!(),
         };
@@ -37,7 +30,7 @@ fn same_item_by_compartment(rucksack: &str) -> Option<char> {
     let compartment_2 = &rucksack[rucksack.len() / 2..rucksack.len()];
     let occupancy = get_occupancy(compartment_1);
     for c in compartment_2.chars() {
-        if occupancy[remap_char_to_flatten_loc(c)] {
+        if occupancy[char_bins::remap_char_to_flatten_loc(c)] {
             return Some(c);
         }
     }
