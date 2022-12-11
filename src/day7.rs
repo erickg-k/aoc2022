@@ -200,3 +200,38 @@ pub fn sum_bound_dirs() {
     print_fs_tree(Rc::clone(&root), 0);
     println!("{}", sum_fs_dir_upper_bound(Rc::clone(&root)));
 }
+
+fn find_fs_dir_to_remove(
+    ptr: Rc<RefCell<FileTreeNode>>,
+    lowest: &mut Rc<RefCell<FileTreeNode>>,
+    lower_bound: u64,
+) {
+    let node = (*ptr).borrow();
+    match node.node_type {
+        FileNode::File(_size) => return,
+        FileNode::Directory => {
+            if node.total_size < lower_bound {
+                return;
+            } else if node.total_size < (*lowest).borrow().total_size {
+                *lowest = Rc::clone(&ptr);
+            }
+        }
+    }
+    for child in &node.children {
+        find_fs_dir_to_remove(Rc::clone(child), lowest, lower_bound);
+    }
+}
+
+const ALLOWED_USED_SPACE: u64 = 70000000 - 30000000;
+
+pub fn smallest_dirs_remove() {
+    let root = build_fs_tree();
+    print_fs_tree(Rc::clone(&root), 0);
+
+    let used_space = (*Rc::clone(&root)).borrow().total_size;
+    let lower_bound = used_space - ALLOWED_USED_SPACE;
+
+    let mut lowest = Rc::clone(&root);
+    find_fs_dir_to_remove(Rc::clone(&root), &mut lowest, lower_bound);
+    println!("{}", (*lowest).borrow().total_size);
+}
