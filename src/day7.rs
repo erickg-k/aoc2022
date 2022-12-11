@@ -31,7 +31,7 @@ struct FileTreeNode {
 }
 
 const ROOT: &str = "/";
-
+const DIR_TOTAL_SIZE_UPPER_THRESHOLD: u64 = 100000;
 fn build_fs_tree() -> Rc<RefCell<FileTreeNode>> {
     let root = Rc::new(RefCell::new(FileTreeNode {
         name: String::from(ROOT),
@@ -119,6 +119,21 @@ fn print_fs_tree(ptr: Rc<RefCell<FileTreeNode>>, level: usize) {
     }
 }
 
+fn sum_fs_dir_upper_bound(ptr: Rc<RefCell<FileTreeNode>>) -> u64 {
+    let mut sum: u64 = 0;
+    let node = (*ptr).borrow();
+    if let FileNode::File(_size) = node.node_type {
+        return 0;
+    }
+    if node.total_size <= DIR_TOTAL_SIZE_UPPER_THRESHOLD {
+        sum += node.total_size;
+    }
+    for child in &node.children {
+        sum += sum_fs_dir_upper_bound(Rc::clone(child));
+    }
+    return sum;
+}
+
 fn sum_fs_tree(ptr: Rc<RefCell<FileTreeNode>>) -> u64 {
     let mut node = (*ptr).borrow_mut();
     if let FileNode::File(size) = node.node_type {
@@ -182,7 +197,6 @@ fn build_fs_tree_in_hash_map() -> HashMap<String, FileNode> {
 
 pub fn sum_bound_dirs() {
     let root = build_fs_tree();
-
-    println!("{:#?}", *root);
-    print_fs_tree(root, 0);
+    print_fs_tree(Rc::clone(&root), 0);
+    println!("{}", sum_fs_dir_upper_bound(Rc::clone(&root)));
 }
