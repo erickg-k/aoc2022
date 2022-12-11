@@ -15,8 +15,8 @@ enum FileNode {
 impl fmt::Display for FileNode {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            FileNode::Directory => write!(f, "(directory)"),
-            FileNode::File(size) => write!(f, "{size}"),
+            FileNode::Directory => write!(f, "(dir)"),
+            FileNode::File(size) => write!(f, "(file, size={size})"),
         }
     }
 }
@@ -27,6 +27,7 @@ struct FileTreeNode {
     node_type: FileNode,
     parent: Weak<RefCell<FileTreeNode>>,
     children: Vec<Rc<RefCell<FileTreeNode>>>,
+    total_size: u64,
 }
 
 const ROOT: &str = "/";
@@ -37,6 +38,7 @@ fn build_fs_tree() -> Rc<RefCell<FileTreeNode>> {
         node_type: FileNode::Directory,
         parent: Weak::new(),
         children: Vec::new(),
+        total_size: 0,
     }));
     let mut processing_ls_output = false;
     let mut ptr = Rc::clone(&root);
@@ -81,6 +83,7 @@ fn build_fs_tree() -> Rc<RefCell<FileTreeNode>> {
                         node_type: FileNode::Directory,
                         parent: Rc::downgrade(&ptr),
                         children: Vec::new(),
+                        total_size: 0,
                     }
                 } else {
                     FileTreeNode {
@@ -88,6 +91,7 @@ fn build_fs_tree() -> Rc<RefCell<FileTreeNode>> {
                         node_type: FileNode::File(dir_or_size.parse::<u64>().expect("Got a size")),
                         parent: Rc::downgrade(&ptr),
                         children: Vec::new(),
+                        total_size: 0,
                     }
                 };
                 (*ptr)
@@ -97,18 +101,35 @@ fn build_fs_tree() -> Rc<RefCell<FileTreeNode>> {
             }
         }
     }
+    sum_fs_tree(Rc::clone(&root));
     return root;
 }
 
 fn print_fs_tree(ptr: Rc<RefCell<FileTreeNode>>, level: usize) {
     let node = (*ptr).borrow();
-    let lead = if level == 0 { "" } else { "|" };
-    let blanks = "--".repeat(level);
-    let leading_chars = lead.to_string() + &blanks;
-    println!("{}{} | {}", leading_chars, node.name, node.node_type);
-    for child_cell in &node.children {
-        print_fs_tree(Rc::clone(child_cell), level + 1);
+    let lead = "-";
+    let blanks = "  ".repeat(level);
+    let leading_chars = blanks + &lead.to_string();
+    println!(
+        "{} {} {} | (total_size={})",
+        leading_chars, node.name, node.node_type, node.total_size
+    );
+    for child in &node.children {
+        print_fs_tree(Rc::clone(child), level + 1);
     }
+}
+
+fn sum_fs_tree(ptr: Rc<RefCell<FileTreeNode>>) -> u64 {
+    let mut node = (*ptr).borrow_mut();
+    if let FileNode::File(size) = node.node_type {
+        node.total_size = size;
+        return node.total_size;
+    }
+    node.total_size = node
+        .children
+        .iter()
+        .fold(0, |sum, val| sum + sum_fs_tree(Rc::clone(val)));
+    return node.total_size;
 }
 
 #[allow(dead_code, unused_imports)]
