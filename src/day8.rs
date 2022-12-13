@@ -1,4 +1,5 @@
 use std::cmp;
+use std::fmt::Display;
 use std::io;
 use std::vec::Vec;
 
@@ -15,6 +16,17 @@ fn get_treemap() -> Vec<Vec<u8>> {
         treemap.push(row);
     }
     return treemap;
+}
+
+fn print_treemap<T: Display>(treemap: &Vec<Vec<T>>) {
+    println!("----------------");
+    for row in treemap {
+        for column in row {
+            print!("{}", column)
+        }
+        println!("");
+    }
+    println!("----------------");
 }
 
 /// 4 scanning directions:
@@ -63,15 +75,15 @@ fn get_treemap_masks_negative(treemap: &Vec<Vec<u8>>, column: bool) -> Vec<Vec<u
     return mask;
 }
 
-fn get_treemap_increasing_length_from_top_to_bottom(treemap: &Vec<Vec<i64>>) -> Vec<Vec<i64>> {
+fn get_treemap_increasing_length(treemap: &Vec<Vec<i64>>) -> Vec<Vec<i64>> {
     let direction = 0 as usize;
     let mut increasing_length = treemap.clone();
     let len_row = treemap.len() as usize;
     let len_column = treemap[0].len() as usize;
-    for j in 0..len_column {
+    for i in 0..len_row {
         let mut len_seq: i64 = 0;
-        let mut prev_height = treemap[0][j];
-        for i in 1..len_row-1 {
+        let mut prev_height = treemap[i][0];
+        for j in 1..len_column - 1 {
             len_seq += (prev_height < treemap[i][j]) as i64;
             increasing_length[i][j] = len_seq + 1;
             if prev_height >= treemap[i][j] {
@@ -94,15 +106,50 @@ fn reshape_treemap_boundary(treemap: &Vec<Vec<u8>>) -> Vec<Vec<i64>> {
         }
         new_treemap.push(row);
     }
-    for j in 1..len_column-1 {
+    for j in 1..len_column - 1 {
         new_treemap[0][j] = cmp::max(new_treemap[0][j], new_treemap[1][j]);
-        new_treemap[len_row-1][j] = cmp::max(new_treemap[len_row-1][j], new_treemap[len_row-2][j]);
+        new_treemap[len_row - 1][j] =
+            cmp::max(new_treemap[len_row - 1][j], new_treemap[len_row - 2][j]);
     }
-    for i in 1..len_row-1 {
+    for i in 1..len_row - 1 {
         new_treemap[i][0] = cmp::max(new_treemap[i][0], new_treemap[i][1]);
-        new_treemap[i][len_column-1] = cmp::max(new_treemap[i][len_column-1], new_treemap[i][len_column-2]);
+        new_treemap[i][len_column - 1] = cmp::max(
+            new_treemap[i][len_column - 1],
+            new_treemap[i][len_column - 2],
+        );
     }
     return new_treemap;
+}
+
+// it's not a great api.
+// down and right both true is the identical of treemap
+fn recreate_treemap_by_dir(treemap: &Vec<Vec<i64>>, down: bool, right: bool) -> Vec<Vec<i64>> {
+    assert!(!(down && right));
+
+    // it's stored row firstly
+    if right {
+        if down {
+            return treemap.to_vec();
+        } else {
+            return treemap
+                .into_iter()
+                .rev()
+                .map(|r| r.clone())
+                .collect::<Vec<Vec<i64>>>();
+        }
+    } else {
+        let mut new_treemap = Vec::new();
+        if down {
+            for row in treemap {
+                new_treemap.push(row.into_iter().rev().map(|r| r.clone()).collect());
+            }
+        } else {
+            for row in treemap.into_iter().rev() {
+                new_treemap.push(row.into_iter().rev().map(|r| r.clone()).collect());
+            }
+        }
+        return new_treemap;
+    }
 }
 
 pub fn sum_visible_trees() {
@@ -134,6 +181,18 @@ pub fn max_visible_trees() {
     let treemap = reshape_treemap_boundary(&get_treemap());
     let len_row = treemap.len();
     let len_column = treemap[0].len();
-    let increasing_length_from_top_to_bottom = get_treemap_increasing_length_from_top_to_bottom(&treemap);
-    println!("{:?}", increasing_length_from_top_to_bottom);
+    println!("treemap:");
+    print_treemap(&treemap);
+    println!("reshaped treemap:");
+    let resahped_treemap = recreate_treemap_by_dir(
+        &recreate_treemap_by_dir(&treemap, false, false),
+        true,
+        false,
+    );
+    print_treemap(&resahped_treemap);
+    println!("increasing length treemap:");
+    let increasing_length = get_treemap_increasing_length(&resahped_treemap);
+    print_treemap(&increasing_length);
+    println!("increasing length treemap in correct direction:");
+    print_treemap(&recreate_treemap_by_dir(&increasing_length, false, true));
 }
