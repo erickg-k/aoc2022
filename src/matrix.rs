@@ -4,6 +4,43 @@ use std::fmt;
 use std::rc::Rc;
 use std::vec::Vec;
 
+#[allow(dead_code)]
+pub const DIRECTIONS_WITH_ADJACENCY: [(i32, i32); 4] = [(1, 0), (0, 1), (-1, 0), (0, -1)];
+#[allow(dead_code)]
+pub const DIRECTIONS_WITH_ADJACENCY_AND_ORIGIN: [(i32, i32); 5] =
+    [(1, 0), (0, 1), (-1, 0), (0, -1), (0, 0)];
+#[allow(dead_code)]
+pub const DIRECTIONS_WITH_ADJACENCY_AND_DIAGONAL: [(i32, i32); 8] = [
+    (1, 0),
+    (0, 1),
+    (-1, 0),
+    (0, -1),
+    (1, 1),
+    (1, -1),
+    (-1, 1),
+    (-1, -1),
+];
+#[allow(dead_code)]
+pub const DIRECTIONS_WITH_ADJACENCY_AND_DIAGONAL_AND_ORIGIN: [(i32, i32); 9] = [
+    (1, 0),
+    (0, 1),
+    (-1, 0),
+    (0, -1),
+    (1, 1),
+    (1, -1),
+    (-1, 1),
+    (-1, -1),
+    (0, 0),
+];
+
+#[derive(Debug)]
+pub enum Direction {
+    Left,
+    Right,
+    Up,
+    Down,
+}
+
 #[derive(Clone, Debug)]
 #[allow(dead_code)]
 pub struct Matrix<T> {
