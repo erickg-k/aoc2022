@@ -5,7 +5,7 @@ use std::ops::Sub;
 use std::vec::Vec;
 
 #[derive(Clone, Debug)]
-pub struct Point<T> {
+struct Point<T> {
     x: T,
     y: T,
 }
