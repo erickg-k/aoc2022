@@ -143,6 +143,7 @@ fn print_monkeys(monkeys: &Vec<RefCell<MonkeyMeta>>) {
 }
 
 const TEST_ROUNDS: u64 = 20;
+const MANAGED_WORRY_LEVEL: i64 = 3;
 
 pub fn get_two_most_active_monkey() {
     let monkeys = get_monkey_meta();
@@ -166,7 +167,52 @@ pub fn get_two_most_active_monkey() {
                     Operation::Subtract => tmp_operands[0] - tmp_operands[1],
                     Operation::Multiply => tmp_operands.iter().fold(1, |res, val| res * val),
                     Operation::Divide => tmp_operands[0] / tmp_operands[1],
-                } / 3;
+                } / MANAGED_WORRY_LEVEL;
+                let next_monkey_idx =
+                    monkey.toss_to[(result % monkey.test_divisor == 0) as usize] as usize;
+                let mut next_monkey = monkeys[next_monkey_idx].borrow_mut();
+                next_monkey.items.push_back(result);
+            }
+        }
+        println!("\nAfter round {}:", i + 1);
+        print_monkeys(&monkeys);
+    }
+
+    let mut heap = BinaryHeap::from(
+        monkeys
+            .iter()
+            .map(|m| m.borrow().num_inspected)
+            .collect::<Vec<i64>>(),
+    );
+    let result = heap.pop().unwrap() * heap.pop().unwrap();
+    println!("{}", result)
+}
+
+const TEST_MANY_ROUNDS: u64 = 10000;
+
+pub fn get_two_most_active_monkey_many_rounds() {
+    let monkeys = get_monkey_meta();
+    print_monkeys(&monkeys);
+
+    for i in 0..TEST_MANY_ROUNDS {
+        for monkey_cell in &monkeys {
+            let mut monkey = monkey_cell.borrow_mut();
+            while let Some(item) = monkey.items.pop_front() {
+                monkey.num_inspected += 1;
+                let tmp_operands = monkey
+                    .operands
+                    .iter()
+                    .map(|o| match o {
+                        Operand::Value(v) => *v,
+                        Operand::Variable => item,
+                    })
+                    .collect::<Vec<i64>>();
+                let result = match monkey.operation {
+                    Operation::Add => tmp_operands.iter().fold(0, |res, val| res + val),
+                    Operation::Subtract => tmp_operands[0] - tmp_operands[1],
+                    Operation::Multiply => tmp_operands.iter().fold(1, |res, val| res * val),
+                    Operation::Divide => tmp_operands[0] / tmp_operands[1],
+                };
                 let next_monkey_idx =
                     monkey.toss_to[(result % monkey.test_divisor == 0) as usize] as usize;
                 let mut next_monkey = monkeys[next_monkey_idx].borrow_mut();
