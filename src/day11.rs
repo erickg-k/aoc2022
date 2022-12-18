@@ -31,7 +31,7 @@ impl fmt::Display for MonkeyMeta {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             f,
-            "(items={{{}}}, operation={:?}, operands=[{:?},{:?}], test_divisor={}, toss_to=[{},{}], inspected={})",
+            "(items={{{}}},\n           operation={:?}, operands=[{:?},{:?}],\n           test_divisor={}, toss_to=[{},{}],\n           inspected={})",
             self.items
                 .iter()
                 .map(|x| x.to_string())
@@ -145,35 +145,39 @@ fn print_monkeys(monkeys: &Vec<RefCell<MonkeyMeta>>) {
 const TEST_ROUNDS: u64 = 20;
 const MANAGED_WORRY_LEVEL: i64 = 3;
 
+fn simulate_round(monkeys: &Vec<RefCell<MonkeyMeta>>, managed_level: i64) {
+    for monkey_cell in monkeys {
+        let mut monkey = monkey_cell.borrow_mut();
+        while let Some(item) = monkey.items.pop_front() {
+            monkey.num_inspected += 1;
+            let tmp_operands = monkey
+                .operands
+                .iter()
+                .map(|o| match o {
+                    Operand::Value(v) => *v,
+                    Operand::Variable => item,
+                })
+                .collect::<Vec<i64>>();
+            let result = match monkey.operation {
+                Operation::Add => tmp_operands.iter().fold(0, |res, val| res + val),
+                Operation::Subtract => tmp_operands[0] - tmp_operands[1],
+                Operation::Multiply => tmp_operands.iter().fold(1, |res, val| res * val),
+                Operation::Divide => tmp_operands[0] / tmp_operands[1],
+            } / managed_level;
+            let next_monkey_idx =
+                monkey.toss_to[(result % monkey.test_divisor == 0) as usize] as usize;
+            let mut next_monkey = monkeys[next_monkey_idx].borrow_mut();
+            next_monkey.items.push_back(result);
+        }
+    }
+}
+
 pub fn get_two_most_active_monkey() {
     let monkeys = get_monkey_meta();
     print_monkeys(&monkeys);
 
     for i in 0..TEST_ROUNDS {
-        for monkey_cell in &monkeys {
-            let mut monkey = monkey_cell.borrow_mut();
-            while let Some(item) = monkey.items.pop_front() {
-                monkey.num_inspected += 1;
-                let tmp_operands = monkey
-                    .operands
-                    .iter()
-                    .map(|o| match o {
-                        Operand::Value(v) => *v,
-                        Operand::Variable => item,
-                    })
-                    .collect::<Vec<i64>>();
-                let result = match monkey.operation {
-                    Operation::Add => tmp_operands.iter().fold(0, |res, val| res + val),
-                    Operation::Subtract => tmp_operands[0] - tmp_operands[1],
-                    Operation::Multiply => tmp_operands.iter().fold(1, |res, val| res * val),
-                    Operation::Divide => tmp_operands[0] / tmp_operands[1],
-                } / MANAGED_WORRY_LEVEL;
-                let next_monkey_idx =
-                    monkey.toss_to[(result % monkey.test_divisor == 0) as usize] as usize;
-                let mut next_monkey = monkeys[next_monkey_idx].borrow_mut();
-                next_monkey.items.push_back(result);
-            }
-        }
+        simulate_round(&monkeys, MANAGED_WORRY_LEVEL);
         println!("\nAfter round {}:", i + 1);
         print_monkeys(&monkeys);
     }
@@ -188,47 +192,67 @@ pub fn get_two_most_active_monkey() {
     println!("{}", result)
 }
 
-const TEST_MANY_ROUNDS: u64 = 10000;
+fn get_number_pattern(monkeys: &Vec<RefCell<MonkeyMeta>>, monkey_idx: usize, item: i64) -> i64 {
+    println!("{}: {}", monkey_idx, item);
+
+    let mut cur_idx = monkey_idx;
+    let mut cur_item = item;
+    let mut history = Vec::new();
+    history.push(cur_idx);
+    loop {
+        let monkey = monkeys[cur_idx].borrow();
+        let tmp_operands = monkey
+            .operands
+            .iter()
+            .map(|o| match o {
+                Operand::Value(v) => *v,
+                Operand::Variable => cur_item,
+            })
+            .collect::<Vec<i64>>();
+        cur_item = match monkey.operation {
+            Operation::Add => tmp_operands.iter().fold(0, |res, val| res + val),
+            Operation::Subtract => tmp_operands[0] - tmp_operands[1],
+            Operation::Multiply => tmp_operands.iter().fold(1, |res, val| res * val),
+            Operation::Divide => tmp_operands[0] / tmp_operands[1],
+        };
+        cur_idx = monkey.toss_to[(cur_item % monkey.test_divisor == 0) as usize] as usize;
+        history.push(cur_idx);
+
+        // if cur_idx == monkey_idx {
+        //     println!("{} = {}", cur_idx, cur_item);
+        //     break;
+        // }
+        if cur_item >= f64::sqrt(i64::MAX as f64) as i64 {
+            println!("{:?}", history);
+            break;
+        }
+    }
+    cur_item
+}
+// const TEST_MANY_ROUNDS: u64 = 10000;
 
 pub fn get_two_most_active_monkey_many_rounds() {
     let monkeys = get_monkey_meta();
     print_monkeys(&monkeys);
 
-    for i in 0..TEST_MANY_ROUNDS {
-        for monkey_cell in &monkeys {
-            let mut monkey = monkey_cell.borrow_mut();
-            while let Some(item) = monkey.items.pop_front() {
-                monkey.num_inspected += 1;
-                let tmp_operands = monkey
-                    .operands
-                    .iter()
-                    .map(|o| match o {
-                        Operand::Value(v) => *v,
-                        Operand::Variable => item,
-                    })
-                    .collect::<Vec<i64>>();
-                let result = match monkey.operation {
-                    Operation::Add => tmp_operands.iter().fold(0, |res, val| res + val),
-                    Operation::Subtract => tmp_operands[0] - tmp_operands[1],
-                    Operation::Multiply => tmp_operands.iter().fold(1, |res, val| res * val),
-                    Operation::Divide => tmp_operands[0] / tmp_operands[1],
-                };
-                let next_monkey_idx =
-                    monkey.toss_to[(result % monkey.test_divisor == 0) as usize] as usize;
-                let mut next_monkey = monkeys[next_monkey_idx].borrow_mut();
-                next_monkey.items.push_back(result);
-            }
-        }
-        println!("\nAfter round {}:", i + 1);
-        print_monkeys(&monkeys);
-    }
+    // let mut num_rounds = 0;
+    // loop {
+    //     simulate_round(&monkeys, 1);
+    //     num_rounds += 1;
+    //     println!("\nAfter round {}:", num_rounds);
+    //     print_monkeys(&monkeys);
+    //     if num_rounds > 5 {
+    //         break;
+    //     }
+    // }
 
-    let mut heap = BinaryHeap::from(
-        monkeys
-            .iter()
-            .map(|m| m.borrow().num_inspected)
-            .collect::<Vec<i64>>(),
-    );
-    let result = heap.pop().unwrap() * heap.pop().unwrap();
-    println!("{}", result)
+    // monkey 0: 80 is a special item
+    // monkey 1: 56 is a special item
+    // monkey 2: 52 is a special item
+    for i in 0..monkeys.len() {
+        println!("==========={i}============");
+        for start_num in &monkeys[i].borrow().items {
+            get_number_pattern(&monkeys, i, *start_num);
+        }
+    }
 }
