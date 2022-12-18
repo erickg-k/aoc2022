@@ -18,6 +18,11 @@ enum Operation {
     Divide,
 }
 
+enum Reducer {
+    Division(i64),
+    Modulo(i64),
+}
+
 struct MonkeyMeta {
     items: VecDeque<i64>,
     operation: Operation,
@@ -145,7 +150,7 @@ fn print_monkeys(monkeys: &Vec<RefCell<MonkeyMeta>>) {
 const TEST_ROUNDS: u64 = 20;
 const MANAGED_WORRY_LEVEL: i64 = 3;
 
-fn simulate_round(monkeys: &Vec<RefCell<MonkeyMeta>>, managed_level: i64) {
+fn simulate_round(monkeys: &Vec<RefCell<MonkeyMeta>>, reducer: Reducer) {
     for monkey_cell in monkeys {
         let mut monkey = monkey_cell.borrow_mut();
         while let Some(item) = monkey.items.pop_front() {
@@ -158,12 +163,16 @@ fn simulate_round(monkeys: &Vec<RefCell<MonkeyMeta>>, managed_level: i64) {
                     Operand::Variable => item,
                 })
                 .collect::<Vec<i64>>();
-            let result = match monkey.operation {
+            let mut result = match monkey.operation {
                 Operation::Add => tmp_operands.iter().fold(0, |res, val| res + val),
                 Operation::Subtract => tmp_operands[0] - tmp_operands[1],
                 Operation::Multiply => tmp_operands.iter().fold(1, |res, val| res * val),
                 Operation::Divide => tmp_operands[0] / tmp_operands[1],
-            } / managed_level;
+            };
+            result = match reducer {
+                Reducer::Division(divisor) => result / divisor,
+                Reducer::Modulo(modulos) => result % modulos,
+            };
             let next_monkey_idx =
                 monkey.toss_to[(result % monkey.test_divisor == 0) as usize] as usize;
             let mut next_monkey = monkeys[next_monkey_idx].borrow_mut();
@@ -177,7 +186,7 @@ pub fn get_two_most_active_monkey() {
     print_monkeys(&monkeys);
 
     for i in 0..TEST_ROUNDS {
-        simulate_round(&monkeys, MANAGED_WORRY_LEVEL);
+        simulate_round(&monkeys, Reducer::Division(MANAGED_WORRY_LEVEL));
         println!("\nAfter round {}:", i + 1);
         print_monkeys(&monkeys);
     }
@@ -192,6 +201,7 @@ pub fn get_two_most_active_monkey() {
     println!("{}", result)
 }
 
+#[allow(dead_code, unused_imports)]
 fn get_number_pattern(monkeys: &Vec<RefCell<MonkeyMeta>>, monkey_idx: usize, item: i64) -> i64 {
     println!("{}: {}", monkey_idx, item);
 
@@ -229,30 +239,29 @@ fn get_number_pattern(monkeys: &Vec<RefCell<MonkeyMeta>>, monkey_idx: usize, ite
     }
     cur_item
 }
-// const TEST_MANY_ROUNDS: u64 = 10000;
 
+const TEST_MANY_ROUNDS: u64 = 10000;
 pub fn get_two_most_active_monkey_many_rounds() {
     let monkeys = get_monkey_meta();
     print_monkeys(&monkeys);
 
-    // let mut num_rounds = 0;
-    // loop {
-    //     simulate_round(&monkeys, 1);
-    //     num_rounds += 1;
-    //     println!("\nAfter round {}:", num_rounds);
-    //     print_monkeys(&monkeys);
-    //     if num_rounds > 5 {
-    //         break;
-    //     }
-    // }
-
-    // monkey 0: 80 is a special item
-    // monkey 1: 56 is a special item
-    // monkey 2: 52 is a special item
-    for i in 0..monkeys.len() {
-        println!("==========={i}============");
-        for start_num in &monkeys[i].borrow().items {
-            get_number_pattern(&monkeys, i, *start_num);
-        }
+    let modulos = monkeys
+        .iter()
+        .map(|c| c.borrow().test_divisor)
+        .fold(1, |acc, val| acc * val);
+    for _ in 0..TEST_MANY_ROUNDS {
+        simulate_round(&monkeys, Reducer::Modulo(modulos));
+        // println!("\nAfter round {}:", i+1);
+        // print_monkeys(&monkeys);
     }
+    print_monkeys(&monkeys);
+
+    let mut heap = BinaryHeap::from(
+        monkeys
+            .iter()
+            .map(|m| m.borrow().num_inspected)
+            .collect::<Vec<i64>>(),
+    );
+    let result = heap.pop().unwrap() * heap.pop().unwrap();
+    println!("{}", result)
 }
