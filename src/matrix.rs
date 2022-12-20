@@ -41,6 +41,12 @@ pub enum Direction {
     Down,
 }
 
+#[derive(Clone, PartialEq, Debug)]
+pub struct Point<T> {
+    pub x: T,
+    pub y: T,
+}
+
 #[derive(Clone, Debug)]
 #[allow(dead_code)]
 pub struct Matrix<T> {

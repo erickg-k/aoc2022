@@ -1,14 +1,9 @@
 use crate::matrix;
+use crate::matrix::Point;
 use std::cmp;
 use std::io;
 use std::ops::Sub;
 use std::vec::Vec;
-
-#[derive(Clone, Debug)]
-struct Point<T> {
-    x: T,
-    y: T,
-}
 
 impl<T: std::ops::Sub<Output = T>> Sub for Point<T> {
     type Output = Self;
