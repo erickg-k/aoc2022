@@ -1,9 +1,11 @@
 use crate::char_bins;
 use crate::matrix;
 use crate::matrix::Point;
+use std::cmp;
 use std::collections::VecDeque;
 use std::io;
 use std::vec::Vec;
+
 fn get_hillmap() -> (Vec<Vec<i32>>, Point<usize>, Point<usize>) {
     let mut hillmap = Vec::new();
 
@@ -34,18 +36,15 @@ fn get_hillmap() -> (Vec<Vec<i32>>, Point<usize>, Point<usize>) {
     return (hillmap, start, end);
 }
 
-pub fn min_steps_in_hill() {
-    let (hillmap, start, end) = get_hillmap();
+fn get_min_steps(hillmap: &Vec<Vec<i32>>, start: &Point<usize>, end: &Point<usize>) -> i32 {
     let max_x = hillmap.len();
     let max_y = hillmap[0].len();
     let mut visited = vec![vec![false; max_y]; max_x];
 
     let mut steps = VecDeque::from([(start.clone(), 0)]);
-    let mut result = i32::MIN;
     while let Some((cur, num_steps)) = steps.pop_front() {
-        if cur == end {
-            result = num_steps;
-            break;
+        if cur == *end {
+            return num_steps;
         }
         for (dx, dy) in matrix::DIRECTIONS_WITH_ADJACENCY {
             let x = cur.x as i32 + dx;
@@ -65,7 +64,36 @@ pub fn min_steps_in_hill() {
             }
         }
     }
+    i32::MAX
+}
+
+pub fn min_steps_in_hill() {
+    let (hillmap, start, end) = get_hillmap();
+    let result = get_min_steps(&hillmap, &start, &end);
     println!("start: {:?}", start);
     println!("end: {:?}", end);
     println!("steps: {:?}", result);
+}
+
+// I am lazy
+pub fn min_steps_from_a_in_hill() {
+    let (mut hillmap, start, end) = get_hillmap();
+    let max_x = hillmap.len();
+    let max_y = hillmap[0].len();
+    hillmap[start.x][start.y] = 200;
+
+    let mut min_result = i32::MAX;
+    for i in 0..max_x {
+        for j in 0..max_y {
+            if hillmap[i][j] == 0 {
+                let start = Point {
+                    x: i as usize,
+                    y: j as usize,
+                };
+                min_result = cmp::min(get_min_steps(&hillmap, &start, &end), min_result);
+            }
+        }
+    }
+
+    println!("steps: {:?}", min_result);
 }
