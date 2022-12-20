@@ -6,3 +6,12 @@ pub fn remap_char_to_flatten_loc(c: char) -> usize {
         _ => 0,
     } as usize;
 }
+
+pub fn remap_char_to_i32(c: char) -> i32 {
+    return match c {
+        'a'..='z' => c as i32 - 'a' as i32,
+        'A'..='Z' => c as i32 - 'A' as i32 + 26,
+        '0'..='9' => c as i32 - '0' as i32,
+        _ => 0,
+    };
+}
