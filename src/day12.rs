@@ -91,6 +91,7 @@ pub fn min_steps_from_a_in_hill() {
                     y: j as usize,
                 };
                 min_result = cmp::min(get_min_steps(&hillmap, &start, &end), min_result);
+                // println!("start: {:?} {:?}", start, min_result);
             }
         }
     }
