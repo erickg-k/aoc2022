@@ -4,6 +4,9 @@ use crate::char_bins;
 use std::cell::RefCell;
 use std::collections::VecDeque;
 use std::io;
+use std::io::BufRead;
+use std::io::BufReader;
+use std::io::Read;
 use std::rc::Rc;
 use std::rc::Weak;
 use std::vec::Vec;
@@ -42,11 +45,11 @@ fn get_number_from_queue(queue: &mut VecDeque<i32>) -> Option<i32> {
     }
 }
 
-fn get_packets() -> Vec<(Rc<RefCell<Node>>, Rc<RefCell<Node>>)> {
+fn get_packets(input: &mut impl Read) -> Vec<(Rc<RefCell<Node>>, Rc<RefCell<Node>>)> {
     let mut packets = Vec::new();
     let mut packet_pairs = Vec::new();
 
-    for line in io::stdin().lines() {
+    for line in BufReader::new(input).lines() {
         let line_str = line.expect("IO failed reading data");
         if line_str == "" {
         } else {
@@ -170,44 +173,30 @@ fn print_packet(root: Rc<RefCell<Node>>) {
 }
 
 fn compare_packet_heads(a: &Payload, b: &Payload) -> bool {
+    // println!("a={:?} b={:?}", &a, &b);
     match a {
         Payload::None => match b {
-            Payload::None => {
-                return true;
-            }
             _ => {
-                return false;
+                return true;
             }
         },
         Payload::List(a_next_level) => match b {
             Payload::None => {
-                return false;
+                return true;
             }
             Payload::List(b_next_level) => {
                 return compare_packets(Rc::clone(&a_next_level), Rc::clone(&b_next_level));
             }
-            Payload::Number(n) => {
-                let wrapper = Rc::new(RefCell::new(Node {
-                    payload: Payload::Number(*n),
-                    sibling: None,
-                    level: -1,
-                    parent: Weak::new(),
-                }));
-                return compare_packet_heads(&a, &Payload::List(wrapper));
+            Payload::Number(_) => {
+                return false;
             }
         },
         Payload::Number(n) => match b {
             Payload::None => {
-                return false;
+                return true;
             }
-            Payload::List(b_next_level) => {
-                let wrapper = Rc::new(RefCell::new(Node {
-                    payload: Payload::Number(*n),
-                    sibling: None,
-                    level: -1,
-                    parent: Weak::new(),
-                }));
-                return compare_packet_heads(&Payload::List(wrapper), b);
+            Payload::List(_) => {
+                return true;
             }
             Payload::Number(nb) => {
                 return n <= nb;
@@ -228,7 +217,29 @@ fn split_head(node: Rc<RefCell<Node>>) -> (Payload, Option<Rc<RefCell<Node>>>) {
 fn compare_packets(a: Rc<RefCell<Node>>, b: Rc<RefCell<Node>>) -> bool {
     let (head_a, maybe_con_a) = split_head(Rc::clone(&a));
     let (head_b, maybe_con_b) = split_head(Rc::clone(&b));
-    if !compare_packet_heads(&head_a, &head_b) {
+
+    // do one more unwrap when compare a list to a non-list
+    let head_comparison = if let Payload::List(sub_a) = &head_a {
+        if let Payload::Number(_) = &head_b {
+            compare_packet_heads(&(*sub_a).borrow().payload, &head_b)
+        } else {
+            compare_packet_heads(&head_a, &head_b)
+        }
+    } else if let Payload::Number(_) = &head_a {
+        if let Payload::List(sub_b) = &head_b {
+            compare_packet_heads(&head_a, &(*sub_b).borrow().payload)
+        } else {
+            compare_packet_heads(&head_a, &head_b)
+        }
+    } else {
+        compare_packet_heads(&head_a, &head_b)
+    };
+    println!(
+        "head_a={:?} head_b={:?}, head_comparison={}",
+        &head_a, &head_b, head_comparison
+    );
+
+    if !head_comparison {
         return false;
     }
     if let Some(con_a) = maybe_con_a {
@@ -242,8 +253,9 @@ fn compare_packets(a: Rc<RefCell<Node>>, b: Rc<RefCell<Node>>) -> bool {
 }
 
 pub fn get_distress_signal() {
-    let packets = get_packets();
+    let packets = get_packets(&mut io::stdin());
 
+    let mut sum = 0;
     for i in 0..packets.len() {
         let index = i + 1;
         println!("\n\n\n========{}========", index);
@@ -251,8 +263,77 @@ pub fn get_distress_signal() {
         println!("\n");
         print_packet(Rc::clone(&packets[i].1));
         let success = compare_packets(Rc::clone(&packets[i].0), Rc::clone(&packets[i].1));
+        if success {
+            sum += index;
+        }
         println!("{}", success);
     }
+    println!("sum={}", sum);
+
     // println!("{:?}", packets);
     // print_packet(Rc::clone(&packets[7].1));
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_case_1() {
+        let s = get_packets(&mut "[1,1,3,1,1]\n[1,1,5,1,1]\n".as_bytes());
+        assert!(compare_packets(Rc::clone(&s[0].0), Rc::clone(&s[0].1)));
+    }
+
+    #[test]
+    fn test_case_2() {
+        let s = get_packets(&mut "[[1],[2,3,4]]\n[[1],4]\n".as_bytes());
+        assert!(compare_packets(Rc::clone(&s[0].0), Rc::clone(&s[0].1)));
+    }
+
+    #[test]
+    fn test_case_3() {
+        let s = get_packets(&mut "[9]\n[[8,7,6]]\n".as_bytes());
+        assert!(!compare_packets(Rc::clone(&s[0].0), Rc::clone(&s[0].1)));
+    }
+
+    #[test]
+    fn test_case_4() {
+        let s = get_packets(&mut "[[4,4],4,4]\n[[4,4],4,4,4]\n".as_bytes());
+        assert!(compare_packets(Rc::clone(&s[0].0), Rc::clone(&s[0].1)));
+    }
+
+    #[test]
+    fn test_case_5() {
+        let s = get_packets(&mut "[7,7,7,7]\n[7,7,7]\n".as_bytes());
+        assert!(!compare_packets(Rc::clone(&s[0].0), Rc::clone(&s[0].1)));
+    }
+
+    #[test]
+    fn test_case_6() {
+        let s = get_packets(&mut "[]\n[3]\n".as_bytes());
+        assert!(compare_packets(Rc::clone(&s[0].0), Rc::clone(&s[0].1)));
+    }
+
+    #[test]
+    fn test_case_7() {
+        let s = get_packets(&mut "[[[]]]\n[[]]\n".as_bytes());
+        assert!(!compare_packets(Rc::clone(&s[0].0), Rc::clone(&s[0].1)));
+    }
+
+    #[test]
+    fn test_case_8() {
+        let s = get_packets(
+            &mut "[1,[2,[3,[4,[5,6,7]]]],8,9]\n[1,[2,[3,[4,[5,6,0]]]],8,9]\n".as_bytes(),
+        );
+        assert!(!compare_packets(Rc::clone(&s[0].0), Rc::clone(&s[0].1)));
+    }
+
+    #[test]
+    fn test_case_9() {
+        let s = get_packets(
+            &mut "[[8,[0],[[1],[1,9,4,5],1,5,[2,3,8,8,10]]],[8],[[[10]],[[3,5,3],5,[6],[6,10,7]],[6,[4],[3,6],[6,5,6,1,3],[1,9,10]]],[[4,[8,1,10,3],[9,9]]],[6]]\n[[[8],8,[],[4]],[8,[[10,8,8],2,1,7,0],[[],10,[1,6,3],7],6],[3],[[8,10,9]],[[[],9,10,[0,7,2,10,10]],10,[]]]\n".as_bytes(),
+        );
+        assert!(compare_packets(Rc::clone(&s[0].0), Rc::clone(&s[0].1)));
+    }
+}
+// [1, 2, 4, 5, 8, 10, 12, 13, 14, 17, 18, 21, 24, 25, 28, 29, 31, 32, 34, 35, 36, 37, 39, 40, 44, 47, 52, 53, 54, 56, 57, 58, 60, 62, 63, 64, 65, 67, 69, 70, 71, 72, 76, 77, 78, 81, 84, 87, 90, 91, 92, 94, 95, 99, 100, 103, 106, 108, 111, 112, 113, 115, 116, 121, 123, 124, 127, 130, 136, 138, 139, 142, 143, 146, 148, 149]
