@@ -160,3 +160,27 @@ pub fn get_distress_signal() {
     }
     println!("sum={}", sum);
 }
+
+pub fn get_distress_signal_decorder_key() {
+    let packets = get_packets(&mut io::stdin());
+    let mut flatten = Vec::new();
+    for (a, b) in packets {
+        flatten.push(a);
+        flatten.push(b);
+    }
+    let divider_a = Conlist::Con(vec![Conlist::Con(vec![Conlist::Head(2)])]);
+    let divider_b = Conlist::Con(vec![Conlist::Con(vec![Conlist::Head(6)])]);
+    flatten.push(divider_a.clone());
+    flatten.push(divider_b.clone());
+    flatten.sort_by(|a, b| a.partial_cmp(b).unwrap());
+
+    let result = (flatten
+        .binary_search_by(|probe| probe.partial_cmp(&divider_a).unwrap())
+        .unwrap()
+        + 1)
+        * (flatten
+            .binary_search_by(|probe| probe.partial_cmp(&divider_b).unwrap())
+            .unwrap()
+            + 1);
+    println!("result={:?}", result);
+}
