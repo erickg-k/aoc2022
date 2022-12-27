@@ -47,6 +47,10 @@ pub struct Point<T> {
     pub y: T,
 }
 
+pub fn manhattan_distance_i64(this: &Point<i64>, other: &Point<i64>) -> i64 {
+    i64::abs(this.x - other.x) + i64::abs(this.y - other.y)
+}
+
 #[derive(Clone, Debug)]
 #[allow(dead_code)]
 pub struct Matrix<T> {
