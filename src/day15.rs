@@ -3,7 +3,7 @@ use crate::matrix::Point;
 use std::cmp;
 use std::collections::HashSet;
 use std::io;
-use std::ops::RangeInclusive;
+use std::ops::Range;
 use std::vec::Vec;
 
 #[derive(Debug)]
@@ -67,9 +67,9 @@ fn get_manhattan_sensors(sensors: &Vec<BoundedSensor>) -> Vec<ManhattanSensor> {
     manhattan
 }
 
-fn merge_ranges(ranges: &Vec<RangeInclusive<i64>>) -> Vec<RangeInclusive<i64>> {
+fn merge_ranges(ranges: &Vec<Range<i64>>) -> Vec<Range<i64>> {
     let mut sorted = ranges.clone();
-    sorted.sort_by(|a, b| a.start().cmp(&b.start()));
+    sorted.sort_by(|a, b| a.start.cmp(&b.start));
 
     let mut res = Vec::new();
     if sorted.len() == 0 {
@@ -79,11 +79,11 @@ fn merge_ranges(ranges: &Vec<RangeInclusive<i64>>) -> Vec<RangeInclusive<i64>> {
     res.push(sorted[0].clone());
     for inteval in &sorted[1..] {
         let top = res.first().unwrap().clone();
-        if top.end() < inteval.start() {
+        if top.end < inteval.start {
             // no overlap
             res.push(inteval.clone());
-        } else if top.end() < inteval.end() {
-            let new_inteval = (*top.start())..=(*inteval.end());
+        } else if top.end == inteval.start || top.end < inteval.end {
+            let new_inteval = top.start..inteval.end;
             res.pop();
             res.push(new_inteval);
         }
@@ -106,7 +106,7 @@ pub fn get_num_positions_no_beacon() {
             let used_diff_y = i64::abs(bounded_manhattan.sensor.y - TARGET_Y);
             let rest_x = bounded_manhattan.distance - used_diff_y;
             ranges.push(
-                (bounded_manhattan.sensor.x - rest_x)..=(bounded_manhattan.sensor.x + rest_x),
+                (bounded_manhattan.sensor.x - rest_x)..(bounded_manhattan.sensor.x + rest_x + 1),
             );
         }
     }
@@ -121,7 +121,7 @@ pub fn get_num_positions_no_beacon() {
         .collect();
     let x_point_set: HashSet<i64> = x_points.into_iter().collect();
     for r in ranges {
-        let mut seg_sum = r.end() - r.start() + 1;
+        let mut seg_sum = r.end - r.start;
         for x_point in &x_point_set {
             if r.contains(&x_point) {
                 seg_sum -= 1;
@@ -130,4 +130,49 @@ pub fn get_num_positions_no_beacon() {
         sum += seg_sum;
     }
     println!("sum={}", &sum);
+}
+
+const SEARCH_BOUND: i64 = 4000000;
+
+pub fn get_distress_beacon() {
+    let (sensors, _) = get_locations();
+    let manhattan = get_manhattan_sensors(&sensors);
+
+    for target_y in 0..=SEARCH_BOUND {
+        let mut ranges = Vec::new();
+        for bounded_manhattan in &manhattan {
+            if ((bounded_manhattan.sensor.y - bounded_manhattan.distance)
+                ..=(bounded_manhattan.sensor.y + bounded_manhattan.distance))
+                .contains(&target_y)
+            {
+                // found a sensor in range of TARGET_Y
+                let used_diff_y = i64::abs(bounded_manhattan.sensor.y - target_y);
+                let rest_x = bounded_manhattan.distance - used_diff_y;
+                ranges.push(
+                    (bounded_manhattan.sensor.x - rest_x)
+                        ..(bounded_manhattan.sensor.x + rest_x + 1),
+                );
+            }
+        }
+        ranges = merge_ranges(&ranges);
+        println!("target_y={} {:?}", target_y, ranges);
+        if ranges.len() == 1 && ranges[0].start < 0 && ranges[0].end > SEARCH_BOUND {
+            continue;
+        }
+
+        // this O(n^2) is slow but we can cut lots of branches above.
+        for target_x in 0..=SEARCH_BOUND {
+            let mut matched = false;
+            for range in &ranges {
+                if !matched && range.contains(&target_x) {
+                    matched = true;
+                }
+            }
+            if !matched {
+                println!("x={} y={}", target_x, target_y);
+                println!("score={}", 4000000 * target_x + target_y);
+                return;
+            }
+        }
+    }
 }
