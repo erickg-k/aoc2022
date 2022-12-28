@@ -1,5 +1,5 @@
 extern crate aoc2022;
 
 fn main() {
-    aoc2022::day15::get_distress_beacon();
+    aoc2022::day16::get_max_flow();
 }
