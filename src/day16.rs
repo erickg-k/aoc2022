@@ -1,6 +1,8 @@
 // DP needs a overly large states to represent if a set of valve is opened (minimal bitset)
 // But cutting it to 15 is managable
 
+use itertools::Itertools;
+use std::cmp;
 use std::collections::HashMap;
 use std::collections::HashSet;
 use std::collections::VecDeque;
@@ -106,27 +108,16 @@ struct TransitionState {
     opened: HashSet<usize>,
 }
 
-pub fn get_max_flow() {
-    let (encoded_valve_names, valve_map, tunnel_map) = get_valve_map();
-    let valid: HashSet<usize> = HashSet::from_iter(
-        valve_map
-            .iter()
-            .enumerate()
-            .filter(|(_, rate)| **rate > 0)
-            .map(|(idx, _)| idx)
-            .clone(),
-    );
-    let start = encoded_valve_names.iter().position(|x| x == START).unwrap();
-    let dist = get_distances_valve(&valve_map, &tunnel_map);
-
-    println!(
-        "encoded_valve_names={:?} valve_map={:?}, tunnel_map={:?}",
-        encoded_valve_names, valve_map, tunnel_map
-    );
-    // println!("dist={:?} / valid={:?}", dist, valid);
+fn get_maxed_transit(
+    start: usize,
+    init_time: i64,
+    valve_map: &Vec<i64>,
+    dist: &Vec<Vec<i64>>,
+    valid: &HashSet<usize>,
+) -> TransitionState {
     let mut maxed_transit = TransitionState {
         position: start,
-        time: 0,
+        time: init_time,
         flow: 0,
         released_pressure: 0,
         history: vec![start],
@@ -144,11 +135,8 @@ pub fn get_max_flow() {
             }
         }
 
-        if cur.released_pressure > maxed_transit.released_pressure {
-            maxed_transit = cur.clone();
-        }
         let mut transit = false;
-        for next in &valid {
+        for next in valid {
             if cur.opened.contains(next) {
                 continue;
             }
@@ -174,8 +162,16 @@ pub fn get_max_flow() {
             }
         }
     }
-    println!("{:?}", maxed_transit);
+    maxed_transit
+}
 
+fn print_path(
+    maxed_transit: &TransitionState,
+    valve_map: &Vec<i64>,
+    encoded_valve_names: &Vec<String>,
+    dist: &Vec<Vec<i64>>,
+) {
+    println!("{:?}", maxed_transit);
     let mut minute = 0;
     for i in 1..maxed_transit.history.len() {
         let node = maxed_transit.history[i];
@@ -191,4 +187,66 @@ pub fn get_max_flow() {
         );
         minute += 1;
     }
+}
+
+pub fn get_max_flow() {
+    let (encoded_valve_names, valve_map, tunnel_map) = get_valve_map();
+    let valid: HashSet<usize> = HashSet::from_iter(
+        valve_map
+            .iter()
+            .enumerate()
+            .filter(|(_, rate)| **rate > 0)
+            .map(|(idx, _)| idx)
+            .clone(),
+    );
+    let start = encoded_valve_names.iter().position(|x| x == START).unwrap();
+    let dist = get_distances_valve(&valve_map, &tunnel_map);
+
+    println!(
+        "encoded_valve_names={:?} valve_map={:?}, tunnel_map={:?}",
+        encoded_valve_names, valve_map, tunnel_map
+    );
+    // println!("dist={:?} / valid={:?}", dist, valid);
+    let maxed_transit = get_maxed_transit(start, 0, &valve_map, &dist, &valid);
+    print_path(&maxed_transit, &valve_map, &encoded_valve_names, &dist);
+}
+
+const ELEPHANT_INIT_TIME: i64 = 4;
+
+pub fn get_max_flow_with_elephant() {
+    let (encoded_valve_names, valve_map, tunnel_map) = get_valve_map();
+    let valid: HashSet<usize> = HashSet::from_iter(
+        valve_map
+            .iter()
+            .enumerate()
+            .filter(|(_, rate)| **rate > 0)
+            .map(|(idx, _)| idx)
+            .clone(),
+    );
+    let start = encoded_valve_names.iter().position(|x| x == START).unwrap();
+    let dist = get_distances_valve(&valve_map, &tunnel_map);
+
+    println!(
+        "encoded_valve_names={:?} valve_map={:?}, tunnel_map={:?}",
+        encoded_valve_names, valve_map, tunnel_map
+    );
+    // println!("dist={:?} / valid={:?}", dist, valid);
+    // split valid into half and permutate. The two actors are independent from each other thus less balance graphs will be less optimal.
+    let divided_len = valid.len() / 2;
+    let mut max_release = 0;
+    for valid_split_vec in valid.iter().combinations(divided_len) {
+        let valid_split1: HashSet<usize> =
+            HashSet::from_iter(valid_split_vec.iter().map(|x| *x).cloned());
+        let valid_split2 = valid.difference(&valid_split1).map(|x| *x).collect();
+        let maxed_transit1 =
+            get_maxed_transit(start, ELEPHANT_INIT_TIME, &valve_map, &dist, &valid_split1);
+        let maxed_transit2 =
+            get_maxed_transit(start, ELEPHANT_INIT_TIME, &valve_map, &dist, &valid_split2);
+        max_release = cmp::max(
+            max_release,
+            maxed_transit1.released_pressure + maxed_transit2.released_pressure,
+        );
+    }
+    // print_path(&maxed_transit, &valve_map, &encoded_valve_names, &dist);
+    println!("{}", max_release);
 }
