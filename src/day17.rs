@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::collections::VecDeque;
 use std::io;
 use std::vec::Vec;
@@ -76,12 +77,13 @@ impl World {
         }
     }
 
-    pub fn next_wind(&mut self) -> bool {
+    pub fn next_wind(&mut self) -> (usize, bool) {
+        let idx = self.cur_wind_idx;
         let left = self.wind[self.cur_wind_idx];
 
         self.cur_wind_idx = (self.cur_wind_idx + 1) % self.wind.len();
 
-        left
+        (idx, left)
     }
 
     pub fn next_rock(&mut self) -> Rock {
@@ -197,6 +199,21 @@ fn shall_fall(world: &World, selected_rock: &Rock) -> bool {
     true
 }
 
+fn insert_rock(world: &mut World, rock: &mut Rock) {
+    while world.window.len() < rock.bottom + rock.height - world.chamber_height {
+        world.window.push_back(vec!['.'; WIDTH]);
+    }
+    let rock_form = &world.rocks[rock.selected];
+    for i in 0..rock.height {
+        for j in 0..rock.width {
+            if rock_form[i][j] == '#' {
+                world.window[i + rock.bottom - world.chamber_height][j + rock.left] =
+                    rock_form[i][j];
+            }
+        }
+    }
+}
+
 pub fn simulate_tetris() {
     let wind = get_wind();
 
@@ -205,7 +222,7 @@ pub fn simulate_tetris() {
         let mut rock = world.next_rock();
 
         loop {
-            let push_left = world.next_wind();
+            let (_, push_left) = world.next_wind();
             if push_left {
                 if shall_push_left(&world, &rock) {
                     rock.left -= 1;
@@ -224,18 +241,7 @@ pub fn simulate_tetris() {
             // println!("\n{} rock: left={}, bottom={}", world.num_rock, rock.left, rock.bottom);
         }
 
-        while world.window.len() < rock.bottom + rock.height - world.chamber_height {
-            world.window.push_back(vec!['.'; WIDTH]);
-        }
-        let rock_form = &world.rocks[rock.selected];
-        for i in 0..rock.height {
-            for j in 0..rock.width {
-                if rock_form[i][j] == '#' {
-                    world.window[i + rock.bottom - world.chamber_height][j + rock.left] =
-                        rock_form[i][j];
-                }
-            }
-        }
+        insert_rock(&mut world, &mut rock);
 
         // println!("\n{} landed:", world.num_rock);
         // print_world(&world);
@@ -243,6 +249,95 @@ pub fn simulate_tetris() {
     }
 
     println!("\n{} landed. size = {}", world.num_rock, world.window.len());
+    // print_world(&world);
+}
+
+const CACHE_LOOKBACK_WINDOW_LEN: usize = 25;
+const NUM_LONG_ROCKS: usize = 1000000000000;
+
+fn summary_window(window: &VecDeque<Vec<char>>, lookback_len: usize) -> Option<Vec<i64>> {
+    if window.len() < CACHE_LOOKBACK_WINDOW_LEN {
+        return None;
+    }
+    let mut sum = Vec::new();
+    for i in 0..lookback_len {
+        let win_idx = (window.len() as i64 - i as i64 - 1 as i64) as usize;
+        let row_sum = window[win_idx]
+            .iter()
+            .rev()
+            .fold(0, |acc, x| acc * 2 + (*x == '#') as i64);
+        sum.push(row_sum);
+    }
+    Some(sum)
+}
+
+pub fn simulate_long_tetris() {
+    let wind = get_wind();
+
+    let mut world = World::new(&wind);
+    let mut cache: HashMap<usize, (Vec<i64>, usize, usize)> = HashMap::new();
+    while world.num_rock < NUM_LONG_ROCKS {
+        let mut rock = world.next_rock();
+
+        let (wind_idx, mut push_left) = world.next_wind();
+        let cache_key = rock.selected + wind_idx * 10;
+        if let Some(v) = cache.get(&cache_key) {
+            if let Some(summary) = summary_window(&world.window, CACHE_LOOKBACK_WINDOW_LEN) {
+                if *v.0 == *summary {
+                    let diff_num_rock = world.num_rock - v.1;
+                    let diff_level = world.window.len() - v.2;
+                    println!("{} {:?}", world.num_rock, v);
+                    while world.num_rock <= NUM_LONG_ROCKS - diff_num_rock {
+                        world.num_rock += diff_num_rock;
+                        world.chamber_height += diff_level;
+                    }
+                    // assert!(false);
+                    // continue;
+                    rock.bottom = world.window.len() + NUM_SPACE_BEFORE_ROCK + world.chamber_height;
+                }
+            }
+        }
+        loop {
+            if push_left {
+                if shall_push_left(&world, &rock) {
+                    rock.left -= 1;
+                }
+            } else {
+                if shall_push_right(&world, &rock) {
+                    rock.left += 1;
+                }
+            };
+
+            if shall_fall(&world, &rock) {
+                rock.bottom -= 1;
+            } else {
+                break;
+            }
+            // println!("\n{} rock: left={}, bottom={}", world.num_rock, rock.left, rock.bottom);
+            (_, push_left) = world.next_wind();
+        }
+
+        insert_rock(&mut world, &mut rock);
+        // println!("\n{} landed:", world.num_rock);
+        // print_world(&world);
+        // println!("{}", world.window.len());
+        if let Some(summary) = summary_window(&world.window, CACHE_LOOKBACK_WINDOW_LEN) {
+            cache.insert(
+                cache_key,
+                (
+                    summary.clone(),
+                    world.num_rock,
+                    world.window.len() + world.chamber_height,
+                ),
+            );
+        }
+    }
+
+    println!(
+        "\n{} landed. size = {}",
+        world.num_rock,
+        world.window.len() + world.chamber_height
+    );
     // print_world(&world);
 }
 
